@@ -17,15 +17,10 @@ from p2p import P2PNode
 def main() -> None:
     p2p_port = int(sys.argv[1]) if len(sys.argv) > 1 else 6001
     rpc_port = int(sys.argv[2]) if len(sys.argv) > 2 else 3001
-    peer_arg = sys.argv[3] if len(sys.argv) > 3 else ""
+    peer_port = sys.argv[3] if len(sys.argv) > 3 else ""
 
     node = P2PNode(p2p_port=p2p_port, rpc_port=rpc_port)
-
-    initial_peers = []
-    if peer_arg:
-        # Obsługa samego numeru portu (np. 6001) lub pełnego URL
-        peer_url = peer_arg if peer_arg.startswith("ws://") else f"ws://127.0.0.1:{peer_arg}"
-        initial_peers.append(peer_url)
+    initial_peers = [f"ws://127.0.0.1:{peer_port}"] if peer_port else []
 
     try:
         asyncio.run(node.run(initial_peers=initial_peers))

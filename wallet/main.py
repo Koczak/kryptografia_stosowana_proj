@@ -61,7 +61,7 @@ def run_wallet(filepath: str = "wallet.json", password: str = "password123") -> 
 
 def run_status(port: str = "3001") -> None:
     """Query node status via HTTP RPC."""
-    url = port if port.startswith("http") else f"http://127.0.0.1:{port}/status"
+    url = f"http://127.0.0.1:{port}/status"
     try:
         with urllib.request.urlopen(url, timeout=3.0) as resp:
             data = json.loads(resp.read().decode())
