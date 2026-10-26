@@ -7,7 +7,6 @@ import json
 import time
 import asyncio
 from typing import Dict, Set, List, Optional, Union
-from urllib.parse import urlparse
 
 import websockets
 from websockets.asyncio.server import ServerConnection
@@ -20,8 +19,7 @@ WebSocketConnection = Union[ServerConnection, ClientConnection]
 class P2PNode:
     """P2P network node handling peer exchange and HTTP RPC."""
 
-    def __init__(self, p2p_host: str, p2p_port: int, rpc_port: int) -> None:
-        self.p2p_host: str = p2p_host
+    def __init__(self, p2p_port: int, rpc_port: int) -> None:
         self.p2p_port: int = p2p_port
         self.rpc_port: int = rpc_port
         self.my_p2p_url: str = f"ws://127.0.0.1:{p2p_port}"
@@ -33,11 +31,7 @@ class P2PNode:
 
     def _is_self(self, url: str) -> bool:
         """Check whether the given URL points to this node."""
-        try:
-            parsed = urlparse(url)
-            return parsed.port == self.p2p_port and parsed.hostname in ("localhost", "127.0.0.1", "0.0.0.0")
-        except Exception:
-            return url == self.my_p2p_url
+        return url == self.my_p2p_url or url.endswith(f":{self.p2p_port}")
 
     def log(self, msg: str) -> None:
         """Print timestamped log with node ID."""
@@ -52,7 +46,6 @@ class P2PNode:
 
     async def _handle_connection(self, ws: WebSocketConnection) -> None:
         """Handle incoming and outgoing WebSocket connections."""
-        # Send initial handshake with known peers
         handshake = {
             "type": "HANDSHAKE",
             "node_id": self.node_id,
@@ -77,7 +70,6 @@ class P2PNode:
                         self.known_peers.add(remote_url)
                     self.log(f"Connected to peer: {remote_id} ({remote_url})")
 
-                    # Gossip protocol: connect to newly discovered peers
                     for peer in data.get("known_peers", []):
                         if not self._is_self(peer) and peer not in self.known_peers:
                             self.known_peers.add(peer)
@@ -120,17 +112,14 @@ class P2PNode:
         """Start WebSocket P2P server and HTTP RPC service."""
         self.log(f"Starting P2P on {self.my_p2p_url} | HTTP RPC on http://127.0.0.1:{self.rpc_port}")
 
-        # Start P2P WebSocket server
-        p2p_server = await websockets.serve(self._handle_connection, self.p2p_host, self.p2p_port)
+        p2p_server = await websockets.serve(self._handle_connection, "127.0.0.1", self.p2p_port)
 
-        # Start HTTP server for wallet RPC
         app = web.Application()
         app.router.add_get("/status", self._http_status)
         runner = web.AppRunner(app)
         await runner.setup()
         await web.TCPSite(runner, "127.0.0.1", self.rpc_port).start()
 
-        # Connect to seed peers if provided
         for peer in (initial_peers or []):
             asyncio.create_task(self.connect_to_peer(peer))
 
